@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Style circles with a data-driven property</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1Ijoic2VyZ2JlciIsImEiOiJja3dwOWgzeGQwYWdyMm9xb2pkMDFvYmNuIn0.H9AJ_NLmDNYMed6dvu_Q0A';
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v10',
+            zoom: 12,
+            center: { lng: 34.795826375683305, lat: 32.07022980230573 }
+        });
+
+        map.on('load', () => {
+
+            fetch("addr.json")
+                .then(i => i.json())
+                .then(json => {
+
+                    console.log('json', json);
+                    const pins = json
+                        .filter(i => i.geocoded)
+                        .map(i => {
+                            const { lat, lng } = i.geocoded
+                            return turf.point([+lng, +lat]);
+                        })
+                    const collection = { type: 'FeatureCollection', features: pins }
+                    map.getSource("pins").setData(collection)
+                })
+
+            // Add the vector tileset as a source.
+            map.addSource('pins', {
+                'type': 'geojson',
+                'data': {
+                    'type': 'FeatureCollection',
+                    'features': []
+                }
+            });
+            map.addLayer({
+                'id': 'population',
+                'type': 'circle',
+                'source': 'pins',
+                'paint': {
+                    // Make circles larger as the user zooms from z12 to z22.
+                    'circle-radius': {
+                        'base': 1.75,
+                        'stops': [
+                            [12, 2],
+                            [22, 180]
+                        ]
+                    },
+                    // Color circles by ethnicity, using a `match` expression.
+                    'circle-color': 'red'
+
+                }
+            });
+        });
+    </script>
+
+</body>
+
+</html>

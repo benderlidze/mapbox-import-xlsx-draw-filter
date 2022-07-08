@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Style circles with a data-driven property</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.3.0/mapbox-gl-draw.js'></script>
+    <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.3.0/mapbox-gl-draw.css'
+        type='text/css' />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #drop {
+            right: 0px;
+            position: absolute;
+            z-index: 10;
+            background-color: white;
+        }
+
+        #drop_zone {
+            border: 5px solid blue;
+            width: 200px;
+            height: 100px;
+        }
+
+        #results {
+            display: flex;
+            position: absolute;
+            z-index: 100;
+            background-color: white;
+            padding: 10px;
+            right: 0;
+            top: 150px;
+            max-height: 80vh;
+            border: 5px solid red;
+            overflow-y: auto;
+            flex-direction: column;
+        }
+
+        .download {
+            cursor: pointer;
+            border: 1px solid gray;
+            padding: 10px;
+            margin: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="drop">
+        <div id="drop_zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
+            <p>Drag one or more files to this Drop Zone ...</p>
+        </div>
+    </div>
+
+    <div id="results"></div>
+
+    <div id="map"></div>
+    <script>
+
+        const allPins = [];
+        const resDiv = document.getElementById("results");
+
+        mapboxgl.accessToken = 'pk.eyJ1Ijoic2VyZ2JlciIsImEiOiJja3dwOWgzeGQwYWdyMm9xb2pkMDFvYmNuIn0.H9AJ_NLmDNYMed6dvu_Q0A';
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v10',
+            zoom: 12,
+            center: { lng: 34.795826375683305, lat: 32.07022980230573 }
+        });
+        const Draw = new MapboxDraw();
+        map.addControl(Draw, 'top-left');
+
+        map.on('draw.create', function (e) {
+
+            const drawMode = Draw.getMode();
+            const drawnFeature = e.features[0];
+
+            switch (drawMode) {
+                case 'draw_polygon':
+                    // Draw polygon here
+                    findPinsInsidePolygon(drawnFeature)
+                    break;
+                default: alert('no draw options'); break;
+            }
+
+        });
+
+
+        map.on('load', () => {
+
+            // Add the vector tileset as a source.
+            map.addSource('pins', {
+                'type': 'geojson',
+                'data': {
+                    'type': 'FeatureCollection',
+                    'features': []
+                }
+            });
+            map.addLayer({
+                'id': 'places',
+                'type': 'circle',
+                'source': 'pins',
+                'paint': {
+                    // Make circles larger as the user zooms from z12 to z22.
+                    'circle-radius': {
+                        'base': 1.75,
+                        'stops': [
+                            [12, 2],
+                            [22, 180]
+                        ]
+                    },
+                    // Color circles by ethnicity, using a `match` expression.
+                    'circle-color': 'red'
+
+                }
+            });
+
+
+            map.on('click', 'places', (e) => {
+
+                console.log('e', e);
+                const description = Object.entries(e.features[0].properties).map(i => {
+                    return `${i[0]}:${i[1]}<br>`
+                }).join(" ")
+
+                new mapboxgl.Popup()
+                    .setLngLat(e.lngLat)
+                    .setHTML(description)
+                    .addTo(map);
+            });
+
+            // Change the cursor to a pointer when the mouse is over the places layer.
+            map.on('mouseenter', 'places', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            // Change it back to a pointer when it leaves.
+            map.on('mouseleave', 'places', () => {
+                map.getCanvas().style.cursor = '';
+            });
+        });
+
+        function findPinsInsidePolygon(poly) {
+            if (allPins.length === 0) return;
+
+
+            console.log('allPins', allPins);
+            console.log('allPins', poly);
+
+            const inside = allPins.filter(pin => {
+                return turf.booleanContains(poly, pin);
+            }).map(i => i.properties)
+
+
+            console.log('inside', inside);
+
+            resDiv.innerHTML = inside.length;
+            // inside.forEach((pin, key) => {
+            //     resDiv.innerHTML += key + ". " + pin.properties['שם באנגלית'] + '<br>'
+            // })
+
+            const div = document.createElement("div")
+            div.className = "download"
+            div.innerText = "Download as CSV"
+            div.addEventListener("click", () => {
+                const csv = convertToCsv(inside)
+                downloadFile("data", csv)
+            })
+            resDiv.appendChild(div)
+        }
+
+
+
+        function processFile(file) {
+            console.log('file', file);
+
+            var reader = new FileReader();
+            reader.onload = function () {
+                var text = reader.result;
+                const json = d3.csvParse(reader.result)
+                console.log('json', json);
+
+                const pins = json
+                    .filter(i => i.lat && i.lng)
+                    .map(i => {
+                        const { lat, lng } = i
+                        return turf.point([+lng, +lat], { ...i });
+                    })
+                allPins.push(...pins)
+                const collection = { type: 'FeatureCollection', features: pins }
+                map.getSource("pins").setData(collection)
+
+            };
+            reader.readAsText(file);
+
+        }
+
+
+
+        function dropHandler(ev) {
+            console.log('File(s) dropped');
+
+            // Prevent default behavior (Prevent file from being opened)
+            ev.preventDefault();
+
+            if (ev.dataTransfer.items) {
+                // Use DataTransferItemList interface to access the file(s)
+                for (let i = 0; i < ev.dataTransfer.items.length; i++) {
+                    // If dropped items aren't files, reject them
+                    if (ev.dataTransfer.items[i].kind === 'file') {
+                        const file = ev.dataTransfer.items[i].getAsFile();
+                        processFile(file)
+                    }
+                }
+            } else {
+                // Use DataTransfer interface to access the file(s)
+                for (let i = 0; i < ev.dataTransfer.files.length; i++) {
+                    console.log('... file[' + i + '].name = ' + ev.dataTransfer.files[i].name);
+                }
+            }
+        }
+
+        function dragOverHandler(ev) {
+            console.log('File(s) in drop zone');
+            // Prevent default behavior (Prevent file from being opened)
+            ev.preventDefault();
+
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //PROCESS CSV
+        const addr = []
+        fetch("addr.json")
+            .then(i => i.json())
+            .then(json => {
+                addr.push(...json)
+
+                d3.csv("Sergey job - google maps1 (1).csv")
+                    .then(csv => {
+                        console.log('csv', csv);
+
+                        //get addr 
+                        csv.forEach(e => {
+                            const ad = `${e.city} ${e.number} ${e.street}`
+
+                            const res = addr.find(a => a.address === ad);
+                            if (res && res.geocoded) {
+                                e.lat = res.geocoded.lat
+                                e.lng = res.geocoded.lng
+                            } else {
+                                e.lat = '';
+                                e.lng = '';
+                            }
+                        });
+                        console.log('csv', csv);
+                    })
+
+            })
+        const convertToCsv = (arr) => {
+            const keys = Object.keys(arr[0]);
+            const replacer = (_key, value) => value === null ? '' : value;
+            const processRow = row => keys.map(key => JSON.stringify(row[key], replacer)).join(',');
+            return [keys.join(','), ...arr.map(processRow)].join('\r\n');
+        };
+        const downloadFile = (fileName, data) => {
+            var link = document.createElement('a');
+            link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(data));
+            link.setAttribute('download', fileName);
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+
+    </script>
+
+</body>
+
+</html>
