@@ -10,6 +10,8 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.3.0/mapbox-gl-draw.js'></script>
+    <script lang="javascript" src="https://cdn.sheetjs.com/xlsx-0.18.9/package/dist/xlsx.full.min.js"></script>
+
     <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.3.0/mapbox-gl-draw.css'
         type='text/css' />
 
@@ -182,6 +184,17 @@
             div.addEventListener("click", () => {
                 const csv = convertToCsv(inside)
                 downloadFile("data", csv)
+
+
+
+                let ws = XLSX.utils.json_to_sheet(inside);
+                let wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "sheet");
+                let buf = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' }); // generate a nodejs buffer
+                let str = XLSX.write(wb, { bookType: 'xlsx', type: 'binary' }); // generate a binary string in web browser
+                XLSX.writeFile(wb, `myfilename.xlsx`);
+
+
             })
             resDiv.appendChild(div)
         }
@@ -254,11 +267,6 @@
 
 
 
-
-
-
-
-
         //PROCESS CSV
         const addr = []
         fetch("addr.json")
@@ -295,7 +303,7 @@
         };
         const downloadFile = (fileName, data) => {
             var link = document.createElement('a');
-            link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(data));
+            link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(data));
             link.setAttribute('download', fileName);
             link.style.display = 'none';
             document.body.appendChild(link);
