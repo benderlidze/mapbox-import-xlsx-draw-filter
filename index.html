@@ -268,7 +268,7 @@
 
 
         //PROCESS CSV
-
+        /*
         const addr = []
         fetch("addr_.json")
             .then(i => i.json())
@@ -294,7 +294,8 @@
                         console.log('csv', csv);
                     })
             })
-
+            */
+           
         const convertToCsv = (arr) => {
             const keys = Object.keys(arr[0]);
             const replacer = (_key, value) => value === null ? '' : value;
