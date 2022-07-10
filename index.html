@@ -268,20 +268,20 @@
 
 
         //PROCESS CSV
+
         const addr = []
-        fetch("addr.json")
+        fetch("addr_.json")
             .then(i => i.json())
             .then(json => {
                 addr.push(...json)
 
-                d3.csv("Sergey job - google maps1 (1).csv")
+                d3.csv("sergey job2.2 essentials.csv")
                     .then(csv => {
                         console.log('csv', csv);
 
                         //get addr 
                         csv.forEach(e => {
                             const ad = `${e.city} ${e.number} ${e.street}`
-
                             const res = addr.find(a => a.address === ad);
                             if (res && res.geocoded) {
                                 e.lat = res.geocoded.lat
@@ -293,8 +293,8 @@
                         });
                         console.log('csv', csv);
                     })
-
             })
+
         const convertToCsv = (arr) => {
             const keys = Object.keys(arr[0]);
             const replacer = (_key, value) => value === null ? '' : value;
